@@ -1,0 +1,8 @@
+.stack-work/
+crypto2.cabal
+*~
+_minted*/
+auto/
+ltximg/
+*.bbl
+*.tex

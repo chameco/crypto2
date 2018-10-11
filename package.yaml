@@ -1,0 +1,86 @@
+name:                crypto2
+github:              "chameco/crypto2"
+author:              "Samuel Breese"
+maintainer:          "breess@rpi.edu"
+copyright:           "2018 Samuel Breese"
+
+dependencies:
+- base >= 4.7 && < 5
+- bytestring
+- optparse-applicative
+- network
+- random
+- time
+
+library:
+  source-dirs: src
+
+default-extensions:
+- TupleSections
+- LambdaCase
+- MultiWayIf
+- TypeOperators
+- OverloadedStrings
+- OverloadedLists
+- ViewPatterns
+- PatternSynonyms
+- ExplicitForAll
+- TypeApplications
+- ScopedTypeVariables
+- RankNTypes
+- LiberalTypeSynonyms
+- NamedFieldPuns
+- RecordWildCards
+- FlexibleInstances
+- FlexibleContexts
+- DeriveFunctor
+- DeriveFoldable
+- DeriveTraversable
+- GeneralizedNewtypeDeriving
+- InstanceSigs
+- ConstrainedClassMethods
+- MultiParamTypeClasses
+- FunctionalDependencies
+- DeriveGeneric
+- NamedWildCards
+- PartialTypeSignatures
+- ExistentialQuantification
+- GADTSyntax
+- GADTs
+- TypeFamilies
+- TypeFamilyDependencies
+- AllowAmbiguousTypes
+- KindSignatures
+- ConstraintKinds
+- DataKinds
+- PolyKinds
+- TypeInType
+- EmptyCase
+- StandaloneDeriving
+- DefaultSignatures
+- DeriveAnyClass
+- DerivingStrategies
+- DisambiguateRecordFields
+- DuplicateRecordFields
+- OverloadedLabels
+- BangPatterns
+- ApplicativeDo
+- NegativeLiterals
+- NumDecimals
+- BinaryLiterals
+- QuasiQuotes
+- UnicodeSyntax
+- NoMonomorphismRestriction
+- PostfixOperators
+- PackageImports
+
+executables:
+  crypto2:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - crypto2
