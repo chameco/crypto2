@@ -1,2 +1,60 @@
-# crypto2
-Cryptography and Network Security - Homework 2
+Name: Samuel Breese
+Description: Cryptography and Network Security - Key Exchange
+Language: Haskell
+Dependencies:
+- Stack (https://docs.haskellstack.org/en/stable/README/)
+
+To compile, simply enter this repository and run
+
+  stack build --copy-bins --local-bin-path=.
+
+This will create a binary file called "crypto2", which takes many options.
+Running
+
+  ./crypto2 --help
+
+will provide information about each option and command. The most relevant
+commands are given here:
+ - to run the KDC Diffie-Hellman module:
+     ./crypto2 kdcdh -K <Diffie-Hellman private key>
+ - to run the KDC proper:
+     ./crypto2 kdc
+ - to run a server:
+     ./crypto2 server -c <address of KDC> -i <identifier for server> -K <Diffie-Hellman private key>
+ - to run a client:
+     ./crypto2 client -c <address of KDC> -i <identifier for client> -K <Diffie-Hellman private key> -r <address of server> -I <identifier for server>
+
+The state of the KDC is stored in a SQLite3 database (by default "kdc.sqlite3"),
+which allows us to cleanly sidestep issues of synchronization through SQLite3's
+atomic transactions. It also allows us to do potentially interesting things,
+like running the Diffie-Hellman server and the KDC on different nodes of a
+cluster (e.g., through a networked filesystem).
+
+With regards to details of the implementation, I have compiled some notes.
+
+First, the implementation of Diffie-Hellman should be fairly secure (at least
+compared to the S-DES implementation used for symmetric encryption). Since
+Haskell has a native arbitrary-precision integer type, it was easy to just find
+a large prime online to use as the modulus. I will likely wish to keep this
+implementation relatively unchanged for the final project, while the symmetric
+encryption algorithm must be entirely rewritten (probably using some stream
+cipher).
+
+The network protocol is string-based, with objects separated by semicolons.
+While primitive, this works fairly well here. I would stick with a
+string-based protocol if I was implementing this "at scale" as well, so as
+not to sacrifice compositionality. I would likely implement encryption of
+arbitrary ByteStrings outputting base64, which would then be transmitted in a
+JSON "envelope" alongside some details about the algorithm used. This could be
+abstracted over by the deserialization step (itself a simple wrapper around the
+relevant Aeson FromJSON instance), allowing for transparent encryption or
+compression at any point in the pipeline.
+
+The Needham-Schroeder implementation is precisely that described in the lecture
+slides, with the addition of a timestamp in the portion of the KDC's encrypted
+envelope to party B. When party B receives this envelope from party A, the
+timestamp is checked against the current time, and party B aborts the exchange
+if the difference is more than 10 seconds. Unless the adversary is capable of
+cracking a key in less than 10 seconds (admittedly very possible for S-DES, since
+the entire key space can be stored in a few kilobytes), this mitigates the
+vulnerability to replay attacks.
