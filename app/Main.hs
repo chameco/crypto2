@@ -7,6 +7,8 @@ import System.IO (hPutStrLn, stderr)
 
 import Options.Applicative
 
+import qualified Database.SQLite.Simple as DB
+
 import Vec
 import Bits
 import DES
@@ -32,7 +34,7 @@ kdcDiffieHellman :: Options -> IO ()
 kdcDiffieHellman o = hostDiffieHellman (keyPriv o)
 
 kdc :: Options -> IO ()
-kdc o = hostSessionKey undefined
+kdc o = DB.open (database o) >>= hostSessionKey
 
 client :: Options -> IO ()
 client o = do

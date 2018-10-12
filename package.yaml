@@ -7,10 +7,11 @@ copyright:           "2018 Samuel Breese"
 dependencies:
 - base >= 4.7 && < 5
 - bytestring
-- optparse-applicative
-- network
 - random
 - time
+- network
+- optparse-applicative
+- sqlite-simple
 
 library:
   source-dirs: src

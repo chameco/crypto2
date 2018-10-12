@@ -14,6 +14,8 @@ import System.Random
 import Network.Socket hiding (recv)
 import Network.Socket.ByteString (recv, sendAll)
 
+import qualified Database.SQLite.Simple as DB
+
 import DES
 import DH
 
@@ -63,13 +65,25 @@ generateSessionKey = go 10
           b <- getStdRandom (randomR (True, False))
           pure $ if b then '0' else '1'
 
-lookupKey :: Keys -> String -> Maybe String
-lookupKey [] _ = Nothing
-lookupKey ((i, k):ks) i' | i == i' = Just k
-                         | otherwise = lookupKey ks i'
+ensureTables :: DB.Connection -> IO ()
+ensureTables conn = DB.withTransaction conn $ DB.execute_ conn "create table if not exists keys (identity text primary key, shared_key text)"
 
-hostDiffieHellman :: Integer -> IO ()
-hostDiffieHellman keyPriv = withSocketsDo $ do
+lookupKey :: DB.Connection -> String -> IO (Maybe String)
+lookupKey conn idA = ensureTables conn >> parse <$> DB.withTransaction conn (DB.query conn "select shared_key from table where identity = ?" (DB.Only idA))
+  where parse :: [[String]] -> Maybe String
+        parse ((x:_):_) = Just x
+        parse _ = Nothing
+
+updateKey :: DB.Connection -> String -> String -> IO ()
+updateKey conn idA keyA = do
+  ensureTables conn
+  k <- lookupKey conn idA
+  case k of
+    Just _ -> DB.withTransaction conn $ DB.execute conn "insert into keys (identity, shared_key) values (?, ?)" (idA, keyA) 
+    Nothing -> DB.withTransaction conn $ DB.execute conn "update keys set shared_key = ? where identity = ?" (keyA, idA)
+
+hostDiffieHellman :: DB.Connection -> Integer -> IO ()
+hostDiffieHellman keys keyPriv = withSocketsDo $ do
   addr <- resolve Nothing "3000"
   bracket (host addr) close $ \sock -> forever $ do
     (conn, peer) <- accept sock
@@ -82,6 +96,7 @@ hostDiffieHellman keyPriv = withSocketsDo $ do
             keyA = read $ BS.C8.unpack skeyA
             key = intToString10 $ computeSessionKey keyA keyPriv
         putStrLn $ mconcat ["Computed key \"", key, "\" for \"", BS.C8.unpack idA, "\"!"]
+        updateKey keys (BS.C8.unpack idA) key
         sendAll conn $ BS.C8.pack $ show keyPub
         putStrLn $ mconcat ["Sent public key \"", show keyPub, "\""]
   where keyPub :: Integer
@@ -96,7 +111,7 @@ requestDiffieHellman kdc idA keyPriv = withSocketsDo $ do
   where keyPub :: Integer
         keyPub = computePublicKey keyPriv
 
-hostSessionKey :: Keys -> IO ()
+hostSessionKey :: DB.Connection -> IO ()
 hostSessionKey keys = withSocketsDo $ do
   addr <- resolve Nothing "3000"
   bracket (host addr) close $ \sock -> forever $ do
@@ -107,10 +122,12 @@ hostSessionKey keys = withSocketsDo $ do
       putStrLn $ mconcat ["Received message \"", BS.C8.unpack msg, "\""]
       unless (BS.null msg) $ do
         let (idA:idB:n:_) = BS.C8.split ';' msg
-        keyA <- case lookupKey keys (BS.C8.unpack idA) of
+        kA <- lookupKey keys (BS.C8.unpack idA)
+        keyA <- case kA of
           Just k -> pure k
           _ -> die $ mconcat ["Unknown ID \"", BS.C8.unpack idA, "\""]
-        keyB <- case lookupKey keys (BS.C8.unpack idB) of
+        kB <- lookupKey keys (BS.C8.unpack idB)
+        keyB <- case kB of
           Just k -> pure k
           _ -> die $ mconcat ["Unknown ID \"", BS.C8.unpack idB, "\""]
         keyS <- BS.C8.pack <$> generateSessionKey
