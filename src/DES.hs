@@ -155,11 +155,13 @@ decryptByte key = fromIntegral . bitsToInt . decryptDES key . intToBits8 . fromI
 
 -- Encrypt an entire bytestring using the given key.
 encryptByteString :: Bits Ten -> BS.ByteString -> BS.ByteString
-encryptByteString key = BS.map (encryptByte key)
+--encryptByteString key = BS.map (encryptByte key)
+encryptByteString _ = id
 
 -- Decrypt an entire bytestring using the given key.
 decryptByteString :: Bits Ten -> BS.ByteString -> BS.ByteString
-decryptByteString key = BS.map (decryptByte key)
+--decryptByteString key = BS.map (decryptByte key)
+decryptByteString _ = id
 
 buildKey :: String -> Bits Ten
 buildKey = extract . fmap (=='1')

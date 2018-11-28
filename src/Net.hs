@@ -66,10 +66,10 @@ generateSessionKey = go 10
           pure $ if b then '0' else '1'
 
 ensureTables :: DB.Connection -> IO ()
-ensureTables conn = DB.withTransaction conn $ DB.execute_ conn "create table if not exists keys (identity text primary key, shared_key text)"
+ensureTables conn = putStrLn "Ensuring tables exist" >> DB.withTransaction conn (DB.execute_ conn "create table if not exists keys (identity text primary key, shared_key text)") >> putStrLn "Done"
 
 lookupKey :: DB.Connection -> String -> IO (Maybe String)
-lookupKey conn idA = ensureTables conn >> parse <$> DB.withTransaction conn (DB.query conn "select shared_key from table where identity = ?" (DB.Only idA))
+lookupKey conn idA = putStrLn (mconcat ["Looking up \"", idA, "\""]) >> ensureTables conn >> (parse <$> DB.withTransaction conn (DB.query conn "select shared_key from keys where identity = ?" (DB.Only idA))) <* putStrLn "Done"
   where parse :: [[String]] -> Maybe String
         parse ((x:_):_) = Just x
         parse _ = Nothing
@@ -78,13 +78,15 @@ updateKey :: DB.Connection -> String -> String -> IO ()
 updateKey conn idA keyA = do
   ensureTables conn
   k <- lookupKey conn idA
+  putStrLn $ mconcat ["Inserting \"", idA, "\""]
   case k of
-    Just _ -> DB.withTransaction conn $ DB.execute conn "insert into keys (identity, shared_key) values (?, ?)" (idA, keyA) 
-    Nothing -> DB.withTransaction conn $ DB.execute conn "update keys set shared_key = ? where identity = ?" (keyA, idA)
+    Nothing -> DB.withTransaction conn $ DB.execute conn "insert into keys (identity, shared_key) values (?, ?)" (idA, keyA) 
+    Just _ -> DB.withTransaction conn $ DB.execute conn "update keys set shared_key = ? where identity = ?" (keyA, idA)
+  putStrLn "Done"
 
 hostDiffieHellman :: DB.Connection -> Integer -> IO ()
 hostDiffieHellman keys keyPriv = withSocketsDo $ do
-  addr <- resolve Nothing "3000"
+  addr <- resolve Nothing "3001"
   bracket (host addr) close $ \sock -> forever $ do
     (conn, peer) <- accept sock
     putStrLn $ mconcat ["Accepted connection from \"", show peer, "\""]
@@ -123,6 +125,7 @@ hostSessionKey keys = withSocketsDo $ do
       unless (BS.null msg) $ do
         let (idA:idB:n:_) = BS.C8.split ';' msg
         kA <- lookupKey keys (BS.C8.unpack idA)
+        putStrLn $ mconcat ["Pulled \"", show kA, "\" from database"]
         keyA <- case kA of
           Just k -> pure k
           _ -> die $ mconcat ["Unknown ID \"", BS.C8.unpack idA, "\""]
@@ -156,7 +159,7 @@ requestSessionKey kdc keyA idA idB  = withSocketsDo $ do
 
 hostSession :: String -> IO ()
 hostSession keyB = withSocketsDo $ do
-  addr <- resolve Nothing "3001"
+  addr <- resolve Nothing "3002"
   bracket (host addr) close $ \sock -> forever $ do
     (conn, peer) <- accept sock
     putStrLn $ mconcat ["Accepted connection from \"", show peer, "\""]
@@ -180,7 +183,7 @@ hostSession keyB = withSocketsDo $ do
 
 joinSession :: String -> (String, BS.ByteString) -> IO ()
 joinSession remote (keyS, envB) = withSocketsDo $ do
-  addr <- resolve (Just remote) "3001"
+  addr <- resolve (Just remote) "3002"
   bracket (open addr) close $ \sock -> do
     sendAll sock envB
     n <- decryptByteString (buildKey keyS) <$> recv sock 4096

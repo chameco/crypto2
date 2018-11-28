@@ -31,7 +31,7 @@ decrypt :: Options -> IO ()
 decrypt o = decryptByteString (key o) <$> BS.getContents >>= BS.putStr
 
 kdcDiffieHellman :: Options -> IO ()
-kdcDiffieHellman o = hostDiffieHellman (keyPriv o)
+kdcDiffieHellman o = DB.open (database o) >>= flip hostDiffieHellman (keyPriv o)
 
 kdc :: Options -> IO ()
 kdc o = DB.open (database o) >>= hostSessionKey
